@@ -5,63 +5,65 @@ $username = "root";
 $password = "";
 $dbname = "griya_idn";
 
-// Membuat koneksi ke database
+// Buat koneksi
 $conn = new mysqli($servername, $username, $password, $dbname);
 
-// Cek koneksi
+// Periksa koneksi
 if ($conn->connect_error) {
     die("Koneksi gagal: " . $conn->connect_error);
 }
 
-// Memastikan bahwa 'id' ada di URL dan merupakan integer
-$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-if (!$id) {
+// Pastikan id di GET request ada dan valid
+$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+
+if ($id <= 0) {
     die("ID tidak valid.");
 }
 
-// Mengambil nama file gambar berdasarkan ID properti dan kemudian menghapusnya
+// Ambil data gambar dari database
 $sql = "SELECT images FROM properties WHERE id = ?";
 $stmt = $conn->prepare($sql);
 
 if (!$stmt) {
-    die("Kesalahan persiapan pernyataan: " . $conn->error);
+    die("Kesalahan persiapan statement: " . $conn->error);
 }
 
 $stmt->bind_param("i", $id);
 $stmt->execute();
-$stmt->bind_result($images);
-$stmt->fetch();
-$stmt->close();
+$result = $stmt->get_result();
+$row = $result->fetch_assoc();
 
-if ($images) {
-    $imageArray = explode(',', $images);
-    foreach ($imageArray as $image) {
-        $filePath = 'uploads/' . trim($image); // Trim untuk menghapus spasi di sekitar nama file
+if ($row) {
+    $images = explode(',', $row['images']);
+    foreach ($images as $image) {
+        $filePath = 'uploads/' . $image;
         if (file_exists($filePath)) {
             if (!unlink($filePath)) {
-                echo "Gagal menghapus file: " . htmlspecialchars($filePath) . "<br>";
+                echo "Gagal menghapus file: " . $filePath;
             }
         }
     }
-}
 
-// Menghapus data properti dari database
-$sql = "DELETE FROM properties WHERE id = ?";
-$stmt = $conn->prepare($sql);
+    // Hapus data dari database
+    $sql = "DELETE FROM properties WHERE id = ?";
+    $stmt = $conn->prepare($sql);
 
-if (!$stmt) {
-    die("Kesalahan persiapan pernyataan: " . $conn->error);
-}
+    if (!$stmt) {
+        die("Kesalahan persiapan statement: " . $conn->error);
+    }
 
-$stmt->bind_param("i", $id);
-if (!$stmt->execute()) {
-    die("Kesalahan saat menghapus properti: " . $stmt->error);
+    $stmt->bind_param("i", $id);
+
+    if ($stmt->execute()) {
+        header("Location: update_admin.php");
+        exit();
+    } else {
+        echo "Error: " . $stmt->error;
+    }
+} else {
+    echo "Data tidak ditemukan.";
 }
 
 $stmt->close();
 $conn->close();
-
-// Redirect setelah berhasil menghapus
-header("Location: update_admin.php");
-exit();
 ?>
